@@ -17,6 +17,8 @@ interface DashboardSummaryProps {
   onOpenNewSubject: () => void;
   selectedDifficultyFilter: string;
   onSelectDifficultyFilter: (diff: string) => void;
+  onGoToProgress?: () => void;
+  currentTheme?: string;
 }
 
 export const DashboardSummary: React.FC<DashboardSummaryProps> = ({
@@ -24,6 +26,8 @@ export const DashboardSummary: React.FC<DashboardSummaryProps> = ({
   onOpenNewSubject,
   selectedDifficultyFilter,
   onSelectDifficultyFilter,
+  onGoToProgress,
+  currentTheme,
 }) => {
   const summary = calculateAcademicSummary(subjects);
 

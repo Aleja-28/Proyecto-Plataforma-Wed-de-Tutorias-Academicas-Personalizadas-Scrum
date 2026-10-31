@@ -24,13 +24,13 @@ interface AuthModalProps {
   onOpenSupabaseInfo?: () => void;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({
+export const AuthModal = ({
   isOpen,
   onClose,
   currentUser,
   onSaveProfile,
   onOpenSupabaseInfo,
-}) => {
+}: AuthModalProps) => {
   const [tab, setTab] = useState<'login' | 'register'>('register');
   const [name, setName] = useState(currentUser.name || '');
   const [email, setEmail] = useState(currentUser.email || '');
@@ -47,7 +47,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const supabaseConfigured = isSupabaseConfigured();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: { preventDefault: () => void }) => {
     e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -105,7 +105,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
             if (authData?.user?.id) {
               userId = authData.user.id;
-              // Si la sesión es nula, Supabase tiene activa la confirmación por email
               if (!authData.session) {
                 requiresEmailConfirmation = true;
               }
