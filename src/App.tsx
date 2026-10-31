@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { initialSubjects, initialUser } from './data/initialData';
-import { Subject, UserProfile } from './types';
+import { Subject, UserProfile, ThemeColorId } from './types';
 import { Navbar } from './components/Navbar';
 import { LandingHero } from './components/LandingHero';
 import { DashboardSummary } from './components/DashboardSummary';
@@ -17,7 +17,18 @@ import { HistoryView } from './components/HistoryView';
 import { SimulatorView } from './components/SimulatorView';
 import { AuthModal } from './components/AuthModal';
 import { SupabaseInfoModal } from './components/SupabaseInfoModal';
-import { calculateAcademicSummary } from './utils/gradeCalculations';
+import { ThemeModal } from './components/ThemeModal';
+import { ProgressDashboard } from './components/ProgressDashboard';
+import { 
+  calculateAcademicSummary, 
+  calculateStudentProgressOverview 
+} from './utils/gradeCalculations';
+import { 
+  applyThemeToDocument, 
+  getSavedTheme, 
+  THEME_CONFIGS 
+} from './utils/themeConfig';
+
 import { 
   BookOpen, 
   PlusCircle, 
@@ -64,8 +75,14 @@ export default function App() {
     return initialUser;
   });
 
-  // Navegación de vistas
-  const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'history' | 'simulator'>('dashboard');
+  // Navegación de vistas (Incluye nuevo dashboard de avance y cortes)
+  const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'progress' | 'history' | 'simulator'>('dashboard');
+
+  // Estado del Tema de Color Personalizado (Requisito del Estudiante)
+  const [currentTheme, setCurrentTheme] = useState<ThemeColorId>(() => {
+    return (user.themePreference as ThemeColorId) || getSavedTheme();
+  });
+  const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
 
   // Filtro de dificultad
   const [difficultyFilter, setDifficultyFilter] = useState<string>('todas');
@@ -77,6 +94,25 @@ export default function App() {
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [topicsModalSubject, setTopicsModalSubject] = useState<Subject | null>(null);
   const [workshopModalSubject, setWorkshopModalSubject] = useState<Subject | null>(null);
+
+  // Aplicar tema en el DOM al montar o cuando cambie
+  useEffect(() => {
+    applyThemeToDocument(currentTheme);
+  }, [currentTheme]);
+
+  // Manejar cambio y persistencia del tema de color
+  const handleSelectTheme = (newTheme: ThemeColorId) => {
+    setCurrentTheme(newTheme);
+    applyThemeToDocument(newTheme);
+    const updatedUser: UserProfile = { ...user, themePreference: newTheme };
+    setUser(updatedUser);
+    try {
+      localStorage.setItem('tutorias_user', JSON.stringify(updatedUser));
+      localStorage.setItem('tutorias_theme', newTheme);
+    } catch (e) {
+      console.warn(e);
+    }
+  };
 
   // Estados de sincronización con Supabase
   const [isSyncing, setIsSyncing] = useState(false);
@@ -164,8 +200,10 @@ export default function App() {
     setIsSyncing(false);
   };
 
-  // Cálculos de métricas globales
+  // Cálculos de métricas globales y avance del estudiante
   const summary = calculateAcademicSummary(subjects);
+  const progressOverview = calculateStudentProgressOverview(subjects);
+  const themeConfig = THEME_CONFIGS[currentTheme] || THEME_CONFIGS.sky;
 
   // Materias activas filtradas
   const activeSubjects = subjects.filter(s => !s.isCompleted);
@@ -174,7 +212,7 @@ export default function App() {
     return s.difficulty === difficultyFilter;
   });
 
-  // Acciones CRUD con Supabase (Requisitos 2, 11, 12)
+  // Acciones CRUD con Supabase
   const handleSaveSubject = async (subjectToSave: Subject) => {
     // 1. Actualización optimista en React
     setSubjects(prev => {
@@ -291,10 +329,13 @@ export default function App() {
         onOpenAuth={() => setIsAuthModalOpen(true)}
         onOpenNewSubject={handleOpenNewSubject}
         onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
+        onOpenThemeModal={() => setIsThemeModalOpen(true)}
+        currentTheme={currentTheme}
         isSupabaseConnected={supabaseConnected}
         user={user}
         activeCount={activeSubjects.length}
         overallAverage={summary.overallAverage}
+        regressionCount={progressOverview.countRetroceso}
       />
 
       {/* Contenedor Principal */}
@@ -362,6 +403,8 @@ export default function App() {
               onOpenNewSubject={handleOpenNewSubject}
               selectedDifficultyFilter={difficultyFilter}
               onSelectDifficultyFilter={setDifficultyFilter}
+              onGoToProgress={() => setCurrentView('progress')}
+              currentTheme={currentTheme}
             />
 
             {/* Listado de Materias Activas */}
@@ -369,7 +412,7 @@ export default function App() {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-                    <BookOpen className="w-5 h-5 text-sky-500" />
+                    <BookOpen className="w-5 h-5" style={{ color: themeConfig.primaryHex }} />
                     <span>Materias Activas del Semestre</span>
                   </h2>
                   <p className="text-xs text-slate-500">
@@ -397,7 +440,8 @@ export default function App() {
                   </div>
                   <button
                     onClick={handleOpenNewSubject}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-sky-500 hover:bg-sky-600 text-white text-xs font-bold rounded-xl shadow-xs"
+                    className="inline-flex items-center gap-2 px-5 py-2.5 text-white text-xs font-bold rounded-xl shadow-xs"
+                    style={{ backgroundColor: themeConfig.primaryHex }}
                   >
                     <PlusCircle className="w-4 h-4 text-amber-300" />
                     <span>Registrar Primera Materia</span>
@@ -421,6 +465,19 @@ export default function App() {
           </div>
         )}
 
+        {/* Vista: Dashboard de Avance del Estudiante & Cortes (Requisito del Profesor) */}
+        {currentView === 'progress' && (
+          <ProgressDashboard
+            subjects={subjects}
+            onOpenEditSubject={handleOpenEditSubject}
+            onOpenTopics={handleOpenTopics}
+            onGenerateWorkshop={handleOpenWorkshop}
+            onOpenNewSubject={handleOpenNewSubject}
+            currentTheme={currentTheme}
+            studentName={user.name}
+          />
+        )}
+
         {/* Vista: Simulador de Notas */}
         {currentView === 'simulator' && (
           <SimulatorView
@@ -439,7 +496,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Footer Limpio y Elegante (Requisito 18, 19, 21) */}
+      {/* Footer */}
       <footer className="bg-white border-t border-slate-200/80 py-8 px-4 sm:px-6 lg:px-8 mt-auto">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div className="flex items-center gap-2">
@@ -455,19 +512,29 @@ export default function App() {
 
           <div className="flex items-center gap-4 text-[11px]">
             <button
+              onClick={() => setIsThemeModalOpen(true)}
+              className="flex items-center gap-1.5 text-slate-700 hover:text-slate-900 font-semibold transition-colors"
+              title="Cambiar color de la página"
+            >
+              <span 
+                className="w-2.5 h-2.5 rounded-full inline-block shadow-2xs"
+                style={{ backgroundColor: themeConfig.primaryHex }}
+              />
+              <span>Tema: {themeConfig.name}</span>
+            </button>
+            <span>•</span>
+            <button
               onClick={() => setIsSupabaseModalOpen(true)}
               className="flex items-center gap-1.5 text-emerald-700 hover:text-emerald-900 font-semibold transition-colors"
             >
               <Database className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Integración con Supabase ({supabaseConnected ? 'Conectado' : 'Configurar'})</span>
+              <span>Supabase ({supabaseConnected ? 'Conectado' : 'Configurar'})</span>
             </button>
-            <span>•</span>
-            <span>Paleta Azul Clarito & Amarillo</span>
           </div>
         </div>
       </footer>
 
-      {/* Modal: Registrar o Editar Materia (Requisitos 2, 3, 5, 11, 15, 17) */}
+      {/* Modales */}
       <SubjectModal
         isOpen={isSubjectModalOpen}
         onClose={() => {
@@ -478,7 +545,6 @@ export default function App() {
         initialSubject={editingSubject}
       />
 
-      {/* Modal: Gestión de Temas y Dificultad (Requisitos 7, 8) */}
       {topicsModalSubject && (
         <TopicsModal
           isOpen={!!topicsModalSubject}
@@ -489,7 +555,6 @@ export default function App() {
         />
       )}
 
-      {/* Modal: Taller de Refuerzo, Materiales y Exportación PDF (Requisitos 9, 10, 16) */}
       {workshopModalSubject && (
         <WorkshopModal
           isOpen={!!workshopModalSubject}
@@ -499,7 +564,6 @@ export default function App() {
         />
       )}
 
-      {/* Modal: Autenticación y Registro con Supabase (Requisito 1) */}
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
@@ -511,12 +575,19 @@ export default function App() {
         }}
       />
 
-      {/* Modal: Información y Esquema SQL de Supabase */}
       <SupabaseInfoModal
         isOpen={isSupabaseModalOpen}
         onClose={() => setIsSupabaseModalOpen(false)}
         onSyncNow={handleSyncNow}
         isSyncing={isSyncing}
+      />
+
+      <ThemeModal
+        isOpen={isThemeModalOpen}
+        onClose={() => setIsThemeModalOpen(false)}
+        currentTheme={currentTheme}
+        onSelectTheme={handleSelectTheme}
+        studentName={user.name}
       />
     </div>
   );

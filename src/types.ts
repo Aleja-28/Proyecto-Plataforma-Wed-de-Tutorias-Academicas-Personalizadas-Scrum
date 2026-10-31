@@ -79,6 +79,43 @@ export interface Workshop {
   materials: StudyMaterial[];
 }
 
+export type ThemeColorId = 'sky' | 'emerald' | 'violet' | 'indigo' | 'amber' | 'rose' | 'teal';
+
+export type TrendType = 'ascenso' | 'retroceso' | 'estable' | 'inicial';
+
+export interface CutProgress {
+  cutIndex: number;
+  cutName: string;
+  percentage: number;
+  grade: number | null;
+  evaluationType: EvaluationType;
+  evaluationDetails?: string;
+  deltaFromPrevious: number | null; // Diferencia respecto al corte anterior (+0.4 o -0.4)
+  trend: TrendType; // ascenso, retroceso, estable, inicial
+  topicsCount: number;
+  difficultTopicsCount: number;
+}
+
+export interface SubjectProgressAnalysis {
+  subject: Subject;
+  completedPercentage: number;
+  gradedCutsCount: number;
+  totalCutsCount: number;
+  overallTrend: TrendType;
+  lastDelta: number | null;
+  cutsProgress: CutProgress[];
+  hasRegressed: boolean; // ¿El estudiante retrocedió en algún corte?
+  regressionCutName?: string;
+  regressionAmount?: number;
+  currentAccumulated: number;
+  currentAverage: number;
+  isPassedAlready: boolean;
+  isUnattainableToPass: boolean;
+  neededToPass: number;
+  neededToTarget: number;
+  statusRecommendation: string;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -88,18 +125,19 @@ export interface UserProfile {
   semester: string;
   avatarSeed: string;
   isDemo?: boolean;
+  themePreference?: ThemeColorId;
 }
 
 export interface GradeCalculationResult {
-  currentAccumulated: number; // Puntos ponderados ganados hasta ahora (sobre escala total)
-  completedPercentage: number; // Suma de porcentajes de cortes ya calificados
-  remainingPercentage: number; // Porcentaje por calificar
-  currentAverageOverCompleted: number; // Promedio aritmético ponderado de lo que lleva
-  neededGradeToPass: number; // Requisito 4: Nota necesaria en lo restante para aprobar
-  neededGradeToTarget: number; // Requisito 5: Nota necesaria para alcanzar la nota objetivo
-  isPassedAlready: boolean; // ¿Ya tiene asegurada la aprobación?
-  isUnattainableToPass: boolean; // Requisito 6: ¿Es imposible matemáticamente aprobar?
-  isUnattainableToTarget: boolean; // ¿Es imposible matemáticamente alcanzar el objetivo?
-  maxPossibleFinalGrade: number; // Si saca nota perfecta en todo lo restante
-  minPossibleFinalGrade: number; // Si saca 0 en todo lo restante
+  currentAccumulated: number;
+  completedPercentage: number;
+  remainingPercentage: number;
+  currentAverageOverCompleted: number;
+  neededGradeToPass: number;
+  neededGradeToTarget: number;
+  isPassedAlready: boolean;
+  isUnattainableToPass: boolean;
+  isUnattainableToTarget: boolean;
+  maxPossibleFinalGrade: number;
+  minPossibleFinalGrade: number;
 }
